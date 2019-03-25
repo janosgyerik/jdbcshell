@@ -12,7 +12,6 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 
-import static com.janosgyerik.jdbcshell.cli.CliApplication.DRIVER_CLASS_NAMES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.same;
@@ -29,7 +28,7 @@ public class CliApplicationTest {
     "Options:\n" +
     "\n" +
     "-url URL\n" +
-    "  Jdbc Url; supported drivers: [mysql, postgresql, oracle, sqlserver, h2, derby]\n" +
+    "  Jdbc Url; for example jdbc:mysql://localhost:3306/sonar\n" +
     "-config CONFIG\n" +
     "  Path to config.properties file\n" +
     "-help\n" +
@@ -108,13 +107,6 @@ public class CliApplicationTest {
   }
 
   @Test
-  public void print_error_when_jdbc_driver_unsupported() {
-    underTest.run(new String[]{"-url", "jdbc:foo:bar"});
-    verify(system2).printlnErr("Unsupported driver: foo; supported drivers: [mysql, postgresql, oracle, sqlserver, h2, derby]");
-    verify(system2).exit(1);
-  }
-
-  @Test
   public void run_main_job_with_successfully_parsed_configuration() throws Exception {
     String validUrl = "jdbc:mysql:bar";
     underTest.run(new String[]{"-url", validUrl});
@@ -123,7 +115,6 @@ public class CliApplicationTest {
     verify(connectionConfigConsumer).execute(same(system2), connectionConfigArgumentCaptor.capture());
     ConnectionConfig config = connectionConfigArgumentCaptor.getValue();
     assertThat(config.url).isEqualTo(validUrl);
-    assertThat(config.driverClassName).isEqualTo("com.mysql.jdbc.Driver");
     assertThat(config.username).isNull();
     assertThat(config.password).isNull();
 
@@ -165,15 +156,6 @@ public class CliApplicationTest {
   }
 
   @Test
-  public void print_error_when_jdbc_driver_unsupported_in_config_file() throws IOException {
-    Path path = temporaryFolder.newFile().toPath();
-    Files.write(path, "jdbc.url = jdbc:foo:bar".getBytes());
-    underTest.run(new String[]{"-config", path.toString()});
-    verify(system2).printlnErr("Unsupported driver: foo; supported drivers: [mysql, postgresql, oracle, sqlserver, h2, derby]");
-    verify(system2).exit(1);
-  }
-
-  @Test
   public void run_main_job_with_successfully_parsed_configuration_from_file() throws Exception {
     Path path = temporaryFolder.newFile().toPath();
     Files.write(path, "jdbc.url = jdbc:mysql:bar".getBytes());
@@ -183,7 +165,6 @@ public class CliApplicationTest {
     verify(connectionConfigConsumer).execute(same(system2), connectionConfigArgumentCaptor.capture());
     ConnectionConfig config = connectionConfigArgumentCaptor.getValue();
     assertThat(config.url).isEqualTo("jdbc:mysql:bar");
-    assertThat(config.driverClassName).isEqualTo("com.mysql.jdbc.Driver");
     assertThat(config.username).isNull();
     assertThat(config.password).isNull();
 
@@ -200,7 +181,6 @@ public class CliApplicationTest {
     verify(connectionConfigConsumer).execute(same(system2), connectionConfigArgumentCaptor.capture());
     ConnectionConfig config = connectionConfigArgumentCaptor.getValue();
     assertThat(config.url).isEqualTo("jdbc:mysql:bar");
-    assertThat(config.driverClassName).isEqualTo("com.mysql.jdbc.Driver");
     assertThat(config.username).isEqualTo("foouser");
     assertThat(config.password).isEqualTo("barpass");
 
@@ -233,30 +213,5 @@ public class CliApplicationTest {
     verify(system2).printlnOut("some output");
     verify(system2).printlnErr("some error");
     verify(system2).exit(0);
-  }
-
-  @Test
-  @UseDataProvider("supportedDriversAndClasses")
-  public void run_main_job_for_any_supported_driver(String driverName, String driverClassName) throws Exception {
-    String validUrl = "jdbc:" + driverName + ":bar";
-    underTest.run(new String[]{"-url", validUrl});
-
-    ArgumentCaptor<ConnectionConfig> connectionConfigArgumentCaptor = ArgumentCaptor.forClass(ConnectionConfig.class);
-    verify(connectionConfigConsumer).execute(same(system2), connectionConfigArgumentCaptor.capture());
-    ConnectionConfig config = connectionConfigArgumentCaptor.getValue();
-    assertThat(config.url).isEqualTo(validUrl);
-    assertThat(config.driverClassName).isEqualTo(driverClassName);
-    assertThat(config.username).isNull();
-    assertThat(config.password).isNull();
-
-    verify(system2).exit(0);
-  }
-
-  @DataProvider
-  public static Object[][] supportedDriversAndClasses() {
-    return DRIVER_CLASS_NAMES.entrySet()
-      .stream()
-      .map(entry -> new Object[]{entry.getKey(), entry.getValue()})
-      .toArray(Object[][]::new);
   }
 }
